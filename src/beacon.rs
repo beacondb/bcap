@@ -35,19 +35,46 @@ pub fn parse(input: &[u8]) -> Result<Option<Beacon>, libwifi::error::Error> {
     loop {
         let element_id;
         let length;
-        let data;
+        let mut data;
         (input, (element_id, length)) = tuple((u8, u8))(input)?;
         (input, data) = take(length)(input)?;
 
-        // if use_ie(element_id) {
-        //     let data = match element_id {
-        //         221 => &data[0..3],
-        //         _ => data,
-        //     };
-        elements.push((element_id, data.to_vec()));
-        // } else {
-        //     elements.push((element_id, Vec::new()))
-        // };
+        if element_id == 221 {
+            let oui_eid;
+            (data, oui_eid) = take(4usize)(data)?;
+            let is_stable = match oui_eid {
+                [0x00, 0x50, 0xf2, 0x02] => true, // microsoft, https://en.wikipedia.org/wiki/Wireless_Multimedia_Extensions
+                [0x00, 0x50, 0xf2, 0x04] => true, // microsoft, wifi protected setup
+                _ => false,
+            };
+            if is_stable {
+                let mut x = Vec::from(oui_eid);
+                x.extend(data);
+                elements.push((element_id, x));
+            } else {
+                elements.push((element_id, oui_eid.to_vec()));
+            }
+        } else if element_id == 255 {
+            let ext_eid;
+            (data, ext_eid) = u8(data)?;
+            let is_stable = match ext_eid {
+                // haven't seen any others
+                35 | 36 | 38 | 39 => true,
+                _ => false,
+            };
+            if is_stable {
+                let mut x = Vec::new();
+                x.push(ext_eid);
+                x.extend(data);
+                elements.push((element_id, x));
+            } else {
+                elements.push((element_id, vec![ext_eid]));
+            }
+        } else if use_ie(element_id) {
+            elements.push((element_id, data.to_vec()))
+        } else {
+            elements.push((element_id, Vec::new()))
+        };
 
         if input.len() <= 4 {
             break;
@@ -74,17 +101,7 @@ pub fn use_ie(id: u8) -> bool {
         61 => false,  // ht operation - includes channel number
         67 => false,  // bss available capacity - channel load over time
         201 => false, // reduced neighbour report - 6ghz neighbour scans, helps clients discover aps in 6ghz
-        221 => true,  // vendor specific, todo: could include oui?
-        255 => false, // extended - todo
 
-        // these seem to change rarely?
-        70 => false,
-        74 => false,
-
-        // to look into:
-        // 45 => (), // ht capabilities
-        // 70 => (), // radio measurement capabilities
-        // 133 => (), // cisco
         _ => false,
     }
 }

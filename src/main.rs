@@ -91,7 +91,7 @@ fn main() -> Result<()> {
         "Beacons with stable fingerprints: {}",
         history.len() - bad.len()
     );
-    eprintln!("Beacons with unstable fingreprints: {}", bad.len());
+    eprintln!("Beacons with unstable fingerprints: {}", bad.len());
 
     let mut all = BTreeSet::new();
     for (_, v) in &history {
@@ -101,11 +101,17 @@ fn main() -> Result<()> {
 
     let mut all: BTreeSet<Vec<_>> = BTreeSet::new();
     for (_, v) in history {
+        // let s = v
+        //     .iter()
+        //     .find(|x| x.0 == 0)
+        //     .map(|x| String::from_utf8_lossy(&x.1));
         for (k, v) in &v {
-            println!("{k}");
+            // if *k == 255 {
+            //     println!("{:x?}", &v);
+            // }
         }
+        // println!("{s:?}");
         let v = v.into_iter().filter(|(k, _)| *k != 0).collect();
-        // println!("{v:?}");
         all.insert(v);
     }
     eprintln!("Unique fingerprints (excluding SSID): {}", all.len());
