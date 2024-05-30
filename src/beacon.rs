@@ -70,7 +70,7 @@ pub fn parse(input: &[u8]) -> Result<Option<Beacon>, libwifi::error::Error> {
             } else {
                 elements.push((element_id, vec![ext_eid]));
             }
-        } else if use_ie(element_id) {
+        } else if eid_is_stable(element_id) {
             elements.push((element_id, data.to_vec()))
         } else {
             elements.push((element_id, Vec::new()))
@@ -84,7 +84,7 @@ pub fn parse(input: &[u8]) -> Result<Option<Beacon>, libwifi::error::Error> {
     Ok(Some(Beacon { source, elements }))
 }
 
-pub fn use_ie(id: u8) -> bool {
+pub fn eid_is_stable(id: u8) -> bool {
     match id {
         0 => true,   // ssid
         1 => true,   // supported rates

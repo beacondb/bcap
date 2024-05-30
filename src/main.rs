@@ -14,47 +14,36 @@ mod beacon;
 #[derive(Parser)]
 struct Cli {
     #[clap(subcommand)]
-    source: CaptureSource,
+    command: Command,
 }
 
 #[derive(clap::Subcommand)]
-enum CaptureSource {
-    Device { name: String },
+enum Command {
     File { path: PathBuf },
 }
 
 fn handle_packet(packet: Packet) -> Result<Beacon> {
-    // let signal = get_signal(&packet.data)?.context("Missing signal")?;
     let radiotap = Radiotap::from_bytes(&packet.data)?;
     let payload = &packet.data[radiotap.header.length..];
     let beacon = beacon::parse(payload)?.context("not a beacon")?;
-
-    // let elems: Vec<_> = beacon
-    //     .elements
-    //     .into_iter()
-    //     .filter(|(k, v)| *k != 0)
-    //     .collect();
-    // println!("{:?} {} {ssid:?}", elems, beacon.source);
-    // println!("{:?}", beacon.elements);
-
     Ok(beacon)
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let mut pcap: Capture<dyn Activated> = match cli.source {
-        CaptureSource::Device { name } => {
-            let device = Device::list()?
-                .into_iter()
-                .find(|x| x.name == name)
-                .context("failed to find a device with that name")?;
-            Capture::from_device(device)?
-                .immediate_mode(true)
-                .open()?
-                .into()
-        }
-        CaptureSource::File { path } => Capture::from_file(path)?.into(),
+    let mut pcap: Capture<dyn Activated> = match cli.command {
+        // Command::Device { name } => {
+        //     let device = Device::list()?
+        //         .into_iter()
+        //         .find(|x| x.name == name)
+        //         .context("failed to find a device with that name")?;
+        //     Capture::from_device(device)?
+        //         .immediate_mode(true)
+        //         .open()?
+        //         .into()
+        // }
+        Command::File { path } => Capture::from_file(path)?.into(),
     };
 
     let mut history = BTreeMap::new();
@@ -87,34 +76,19 @@ fn main() -> Result<()> {
         }
     }
 
-    eprintln!(
-        "Beacons with stable fingerprints: {}",
-        history.len() - bad.len()
-    );
-    eprintln!("Beacons with unstable fingerprints: {}", bad.len());
+    eprintln!("Stable fingerprints: {}", history.len() - bad.len());
+    eprintln!("Unstable fingerprints: {}", bad.len());
+    let all = BTreeSet::from_iter(history.iter().map(|x| x.1));
+    eprintln!("Unique fingerprints (excl bssid): {}", all.len());
 
-    let mut all = BTreeSet::new();
-    for (_, v) in &history {
-        all.insert(v);
-    }
-    eprintln!("Unique fingerprints: {}", all.len());
-
-    let mut all: BTreeSet<Vec<_>> = BTreeSet::new();
-    for (_, v) in history {
-        // let s = v
-        //     .iter()
-        //     .find(|x| x.0 == 0)
-        //     .map(|x| String::from_utf8_lossy(&x.1));
-        for (k, v) in &v {
-            // if *k == 255 {
-            //     println!("{:x?}", &v);
-            // }
-        }
-        // println!("{s:?}");
-        let v = v.into_iter().filter(|(k, _)| *k != 0).collect();
-        all.insert(v);
-    }
-    eprintln!("Unique fingerprints (excluding SSID): {}", all.len());
+    // for (k, v) in &history {
+    //     let mut beacon_bytes = Vec::from(k);
+    //     for (k, v) in v {
+    //         beacon_bytes.push(*k);
+    //         beacon_bytes.extend(v);
+    //     }
+    //     let hash = sha256::digest(&beacon_bytes);
+    // }
 
     Ok(())
 }
